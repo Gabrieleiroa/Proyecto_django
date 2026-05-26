@@ -17,10 +17,12 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from vehiculos.views import VehiculoViewSet, AccesorioViewSet, MarcaViewSet, CompraVehiculoViewSet, UsuarioViewSet, PerfilViewSet, MantenimientoViewSet
-
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/auth/login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/vehiculos/', VehiculoViewSet.as_view({
         'get': 'list',
         'post': 'create'
@@ -89,6 +91,9 @@ urlpatterns = [
         'put': 'update',
         'patch': 'partial_update',
         'delete': 'destroy'
+    })),
+    path('api/mantenimiento/<int:pk>/finalizar/', MantenimientoViewSet.as_view({
+        'post': 'finalizar'
     })),
     path('api/vehiculos/<int:pk>/comprar/', VehiculoViewSet.as_view({
         'post': 'comprar'

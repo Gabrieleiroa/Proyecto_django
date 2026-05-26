@@ -7,7 +7,18 @@ class UsuarioSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'perfil']
+        fields = ['id', 'username', 'email', 'password', 'perfil']
+        extra_kwargs = {
+            'password': {'write_only': True}
+        }
+    
+    def create(self, validated_data):
+        user = User.objects.create_user(
+            username=validated_data['username'], 
+            email=validated_data.get('email', ''), 
+            password=validated_data['password']
+        )
+        return user
 
 class PerfilSerializer(serializers.ModelSerializer):
     NombreUsuario = serializers.CharField(source='usuario.username', read_only=True)
@@ -20,7 +31,8 @@ class PerfilSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Perfil
-        fields = ['id', 'usuario_id', 'NombreUsuario', 'telefono', 'direccion']
+        fields = ['id', 'usuario_id', 'NombreUsuario', 'telefono', 'direccion', 'role']
+        read_only_fields = ['role']
 
 class MarcaSerializer(serializers.ModelSerializer):
     class Meta:
@@ -47,7 +59,8 @@ class VehiculoSerializer(serializers.ModelSerializer):
         queryset=Accesorio.objects.all(),
         many=True,
         write_only=True,
-        source='accesorios'
+        source='accesorios',
+        required=False
     )
 
     class Meta:
@@ -59,11 +72,18 @@ class VehiculoSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Los coches se crearon casi al final del siglo XIX")
         return value
 
+    def create(self, validated_data):
+        accesorios = validated_data.pop('accesorios', [])
+        vehiculo = Vehiculo.objects.create(**validated_data)
+        if accesorios:
+            vehiculo.accesorios.set(accesorios)
+        return vehiculo
+    
 class MantenimientoSerializer(serializers.ModelSerializer):
     DetalleVehiculo = serializers.SerializerMethodField()
 
     vehiculo_id = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all(),
+        queryset=Vehiculo.objects.all(),
         write_only=True,
         source='vehiculo'
     )
@@ -88,3 +108,4 @@ class CompraVehiculoSerializer(serializers.ModelSerializer):
         model = CompraVehiculo
         fields = ['id', 'vehiculo', 'vehiculo_info',
                   'perfil', 'perfil_info', 'precio', 'fecha_compra']
+        read_only_fields = ['fecha_compra']

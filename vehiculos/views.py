@@ -3,6 +3,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated, AllowAny, BasePermission
 from django.utils import timezone
 
 from .models import Vehiculo, Mantenimiento, CompraVehiculo, Accesorio, Marca, User, Perfil
@@ -126,6 +127,20 @@ from .serializers import VehiculoSerializer, MantenimientoSerializer, CompraVehi
 #            return Response(serializer.data, status=201)
 #        return Response(serializer.errors, status=400)
 
+class IsManagerOrAdmin(BasePermission):
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        
+        has_role = hasattr(request.user, 'perfil') and request.user.perfil.role in ['manager', 'admin']
+        return request.user.is_staff or has_role
+
+class IsAdminOrReadOnly(BasePermission):
+    def has_permission(self, request, view):
+        if request.method in ['GET', 'HEAD', 'OPTIONS']:
+            return True
+        return request.user and request.user.is_authenticated and (request.user.is_staff or (hasattr(request.user, 'perfil') and request.user.perfil.role in ['manager', 'admin']))
+
 class VehiculoViewSet(viewsets.ModelViewSet):
     queryset = Vehiculo.objects.all()
     serializer_class = VehiculoSerializer
@@ -133,25 +148,32 @@ class VehiculoViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def comprar(self, request, pk=None):
         vehiculo = self.get_object()
-
-        perfil_id = request.data.get('perfil')
         precio = request.data.get('precio')
 
-        if not perfil_id or not precio:
+        if not precio:
             return Response(
-                {"error": "perfil y precio son obligatorios"},
+                {"error": "El precio es obligatorio"},
                 status=status.HTTP_400_BAD_REQUEST
             )
+        perfil_comprador = request.user.perfil
 
-        CompraVehiculo.objects.create(
+        compra, creada = CompraVehiculo.objects.get_or_create(
             vehiculo=vehiculo,
-            perfil_id=perfil_id,
-            precio=precio,
-            fecha_compra=timezone.now()
+            perfil=perfil_comprador,
+            defaults={
+                'precio': precio,
+                'fecha_compra': timezone.now()
+            }
         )
 
+        if not creada:
+            return Response(
+                {"error": "Este perfil ya ha adquirido este vehiculo previamente."},
+                status=status.HTTP_409_CONFLICT
+            )
+
         return Response(
-            {"mensaje": "Compra realizada"},
+            {"mensaje": "Compra realizada con éxito"},
             status=status.HTTP_201_CREATED
         )
     
@@ -160,14 +182,22 @@ class VehiculoViewSet(viewsets.ModelViewSet):
     search_fields = ['modelo', 'marca__nombre']
     ordering_fields = ['anho', 'modelo']
 
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [AllowAny()]
+        if self.action == 'comprar':
+            return [IsAuthenticated()]
+        return [IsManagerOrAdmin()]
+
 class MantenimientoViewSet(viewsets.ModelViewSet):
     queryset = Mantenimiento.objects.all()
     serializer_class = MantenimientoSerializer
+    permission_classes = [IsManagerOrAdmin]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['finalizado']
     search_fields = ['descripcion']
     ordering_fields = ['coste', 'created_at']
     filterset_fields = {
+        'finalizado': ['exact'],
         'coste': ['gte', 'lte'],
         'duracion': ['gte', 'lte'],
     }
@@ -193,7 +223,9 @@ class MantenimientoViewSet(viewsets.ModelViewSet):
 class CompraVehiculoViewSet(viewsets.ModelViewSet):
     queryset = CompraVehiculo.objects.all()
     serializer_class = CompraVehiculoSerializer
-    filter_backends = [DjangoFilterBackend]
+    permission_classes = [IsManagerOrAdmin]
+
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = {
         'precio': ['gte', 'lte']
     }
@@ -203,16 +235,24 @@ class CompraVehiculoViewSet(viewsets.ModelViewSet):
 class AccesorioViewSet(viewsets.ModelViewSet):
     queryset = Accesorio.objects.all()
     serializer_class = AccesorioSerializer
+    permission_classes = [IsAdminOrReadOnly]
 
 class MarcaViewSet(viewsets.ModelViewSet):
     queryset = Marca.objects.all()
     serializer_class = MarcaSerializer
-
+    permission_classes = [IsAdminOrReadOnly]
 
 class UsuarioViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UsuarioSerializer
+    permission_classes = [IsManagerOrAdmin]
 
 class PerfilViewSet(viewsets.ModelViewSet):
-    queryset = Perfil.objects.all()
     serializer_class = PerfilSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if self.request.user.is_staff:
+            return Perfil.objects.all()
+        
+        return Perfil.objects.filter(usuario=self.request.user)
