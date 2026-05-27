@@ -6,8 +6,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny, BasePermission
 from django.utils import timezone
 
-from .models import Vehiculo, Mantenimiento, CompraVehiculo, Accesorio, Marca, User, Perfil
-from .serializers import VehiculoSerializer, MantenimientoSerializer, CompraVehiculoSerializer, AccesorioSerializer, MarcaSerializer, UsuarioSerializer, PerfilSerializer
+from .models import Vehiculo, Mantenimiento, CompraVehiculo, Accesorio, Marca, User, Perfil, CitaMantenimiento
+from .serializers import VehiculoSerializer, MantenimientoSerializer, CompraVehiculoSerializer, AccesorioSerializer, MarcaSerializer, UsuarioSerializer, PerfilSerializer, CitaMantenimeintoSerializer
 
 #Lista de Vehiculos (GET y POST)
 #class VehiculoListAPIView(APIView):
@@ -177,6 +177,45 @@ class VehiculoViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED
         )
     
+    @action(detail=True, methods=['post'])
+
+    def citar(self, request, pk=None):
+        vehiculo = self.get_object()
+        perfil_citador = request.user
+        
+        fecha = request.data.get("fecha")
+        hora = request.data.get("hora")
+        descripcion = request.data.get("descripcion")
+
+        duplicada = CitaMantenimiento.objects.filter(
+            vehiculo=vehiculo,
+            usuario=perfil_citador,
+            fecha=fecha,
+            hora=hora
+        ).exists()
+
+        if duplicada:
+            return Response(
+                {"error": "Este perfil ya ha citado este vehiculo previamente."},
+                status=status.HTTP_409_CONFLICT
+            )
+        
+        cita, creada = CitaMantenimiento.objects.get_or_create(
+        usuario=request.user,
+        vehiculo=vehiculo,
+        fecha=fecha,
+        hora=hora,
+        defaults={
+            'descripcion': descripcion
+        }
+    )
+
+        return Response(
+            {"mensaje": "Cita realizada con éxito"},
+            status=status.HTTP_201_CREATED
+        )
+    
+    
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['marca', 'anho']
     search_fields = ['modelo', 'marca__nombre']
@@ -256,3 +295,30 @@ class PerfilViewSet(viewsets.ModelViewSet):
             return Perfil.objects.all()
         
         return Perfil.objects.filter(usuario=self.request.user)
+    
+class CitaMantenimientoViewSet(viewsets.ModelViewSet):
+    queryset = CitaMantenimiento.objects.all()
+    serializer_class = CitaMantenimeintoSerializer
+    permission_classes = [IsManagerOrAdmin]
+
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_fields = ['estado', 'fecha']
+    ordering_fields = ['fecha', 'hora']
+
+    @action(detail=True, methods=['post'])
+    def citar (self, request, pk=None):
+        citarMantenimiento = self.get_object()
+
+        if citarMantenimiento.citado:
+            return self.response(
+                {"error": "El mantenimiento ya está citado"},
+                status=status.HTTP_409_CONFLICT
+            )
+        
+        citarMantenimiento.finalizado = True
+        citarMantenimiento.save()
+
+        return Response(
+            {"mensaje": "Mantenimiento citado correctamente"},
+            status=status.HTTP_200_OK
+        )

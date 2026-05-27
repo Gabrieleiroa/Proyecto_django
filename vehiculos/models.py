@@ -88,3 +88,32 @@ class CompraVehiculo(models.Model):
 
     def __str__(self):
         return f"{self.vehiculo.modelo} comprado por {self.precio}"
+    
+class CitaMantenimiento(models.Model):
+    ESTADOS = [
+        ('pendiente', 'Pendiente'),
+        ('confirmada', 'Confirmada'),
+        ('cancelada', 'Cancelada'),
+    ]
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
+    vehiculo = models.ForeignKey('Vehiculo', on_delete=models.CASCADE, related_name='citas_mantenimiento')
+    fecha = models.DateField()
+    hora = models.TimeField()
+    descripcion = models.TextField()
+    estado = models.CharField(max_length=20, choices=ESTADOS, default='pendiente')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-fecha']
+        verbose_name = "Cita"
+        verbose_name_plural = "Citas"
+        constraints = [
+            models.UniqueConstraint(
+                fields=['usuario', 'vehiculo', 'fecha', 'hora'], 
+                name='unique_cita'
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.usuario} - {self.vehiculo} ({self.fecha} {self.hora})"

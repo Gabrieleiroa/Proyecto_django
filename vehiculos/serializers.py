@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Perfil, Mantenimiento, Marca, Vehiculo, CompraVehiculo, Accesorio
+from .models import Perfil, Mantenimiento, Marca, Vehiculo, CompraVehiculo, Accesorio, CitaMantenimiento
 
 class UsuarioSerializer(serializers.ModelSerializer):
     perfil = serializers.StringRelatedField(read_only=True)
@@ -109,3 +109,13 @@ class CompraVehiculoSerializer(serializers.ModelSerializer):
         fields = ['id', 'vehiculo', 'vehiculo_info',
                   'perfil', 'perfil_info', 'precio', 'fecha_compra']
         read_only_fields = ['fecha_compra']
+
+class CitaMantenimeintoSerializer(serializers.ModelSerializer):
+    vehiculo_id = serializers.PrimaryKeyRelatedField( queryset=Vehiculo.objects.all(), source='vehiculo', write_only=True)
+    usuario_id = serializers.PrimaryKeyRelatedField( queryset=User.objects.all(), source='usuario', write_only=True)
+    vehiculo = serializers.StringRelatedField(read_only=True)
+    usuario = serializers.StringRelatedField(read_only=True)
+
+    class Meta:
+        model = CitaMantenimiento
+        fields = ['id', 'vehiculo', 'vehiculo_id', 'usuario', 'usuario_id', 'fecha', 'hora', 'estado']

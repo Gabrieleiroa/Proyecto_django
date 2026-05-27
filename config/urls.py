@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from vehiculos.views import VehiculoViewSet, AccesorioViewSet, MarcaViewSet, CompraVehiculoViewSet, UsuarioViewSet, PerfilViewSet, MantenimientoViewSet
+from vehiculos.views import VehiculoViewSet, AccesorioViewSet, MarcaViewSet, CompraVehiculoViewSet, UsuarioViewSet, PerfilViewSet, MantenimientoViewSet, CitaMantenimientoViewSet
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 urlpatterns = [
@@ -98,5 +98,14 @@ urlpatterns = [
     path('api/vehiculos/<int:pk>/comprar/', VehiculoViewSet.as_view({
         'post': 'comprar'
     })),
+    path('api/vehiculos/<int:pk>/pedir_cita_mantenimiento/', CitaMantenimientoViewSet.as_view({
+        'post': 'citar'
+    })),
+    path('api/vehiculos/mis_citas_mantenimiento', CitaMantenimientoViewSet.as_view({
+        'get': 'retrieve',
+        'put': 'update',
+        'patch': 'partial_update',
+        'delete': 'destroy'
+    }))
     #path('api/users/', UserViewSet.as_view()),
 ]
