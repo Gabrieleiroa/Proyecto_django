@@ -101,11 +101,8 @@ urlpatterns = [
     path('api/vehiculos/<int:pk>/pedir_cita_mantenimiento/', CitaMantenimientoViewSet.as_view({
         'post': 'citar'
     })),
-    path('api/vehiculos/mis_citas_mantenimiento', CitaMantenimientoViewSet.as_view({
-        'get': 'retrieve',
-        'put': 'update',
-        'patch': 'partial_update',
-        'delete': 'destroy'
+    path('api/vehiculos/mis_citas_mantenimiento/', CitaMantenimientoViewSet.as_view({
+        'get': 'retrieve'
     }))
     #path('api/users/', UserViewSet.as_view()),
 ]

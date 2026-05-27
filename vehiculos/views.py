@@ -306,19 +306,26 @@ class CitaMantenimientoViewSet(viewsets.ModelViewSet):
     ordering_fields = ['fecha', 'hora']
 
     @action(detail=True, methods=['post'])
-    def citar (self, request, pk=None):
-        citarMantenimiento = self.get_object()
+    def citar(self, request, pk=None):
+        vehiculo = self.get_object()
 
-        if citarMantenimiento.citado:
-            return self.response(
-                {"error": "El mantenimiento ya está citado"},
+        serializer = CitaMantenimeintoSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        usuario_id = serializer.validated_data['usuario_id']
+
+        cita, creada = CitaMantenimiento.objects.get_or_create(
+            vehiculo=vehiculo,
+            usuario_id=usuario_id
+        )
+
+        if not creada:
+            return Response(
+                {"error": "Cita ya ha sido creada anteriormente"},
                 status=status.HTTP_409_CONFLICT
             )
-        
-        citarMantenimiento.finalizado = True
-        citarMantenimiento.save()
 
         return Response(
-            {"mensaje": "Mantenimiento citado correctamente"},
-            status=status.HTTP_200_OK
+            {"mensaje": "Cita creada"},
+            status=status.HTTP_201_CREATED
         )
